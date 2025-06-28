@@ -1,0 +1,74 @@
+import sys
+import pandas as pd
+import re
+from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout, QTextEdit, QPushButton, QLabel
+from PyQt5.QtCore import Qt
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.linear_model import LogisticRegression
+
+class BZekaMini(QWidget):
+    def __init__(self):
+        super().__init__()
+        self.setWindowTitle("B Zeka Mini 2.0")
+        self.resize(500, 300)
+        self.model, self.vectorizer = self.model_egit("data.csv")
+
+        # Arayüz
+        self.layout = QVBoxLayout()
+        self.output = QLabel(">>> B Zeka Mini hazır.")
+        self.output.setWordWrap(True)
+        self.output.setAlignment(Qt.AlignTop)
+
+        self.input_field = QTextEdit()
+        self.input_field.setPlaceholderText("Bir şeyler yaz...")
+        self.input_field.setMaximumHeight(80)
+
+        self.button = QPushButton("Yanıt Al")
+        self.button.clicked.connect(self.get_response)
+
+        self.layout.addWidget(self.output)
+        self.layout.addWidget(self.input_field)
+        self.layout.addWidget(self.button)
+        self.setLayout(self.layout)
+
+    def model_egit(self, csv_path):
+        df = pd.read_csv(csv_path)
+        vec = TfidfVectorizer()
+        X_vec = vec.fit_transform(df["prompt"])
+        y = df["response"]
+        clf = LogisticRegression()
+        clf.fit(X_vec, y)
+        return clf, vec
+
+    def hesapla(self, giris):
+        giris = giris.lower().replace("çarpı", "*").replace("kere", "*") \
+                     .replace("bölü", "/").replace("artı", "+") \
+                     .replace("eksi", "-").replace("topla", "+")
+        sayisal = re.findall(r"[0-9\+\-\*\/\(\)\. ]+", giris)
+        if sayisal:
+            try:
+                return f"Sonuç: {eval(sayisal[0])}"
+            except:
+                return None
+        return None
+
+    def get_response(self):
+        prompt = self.input_field.toPlainText().strip()
+        if not prompt:
+            return
+
+        hesap = self.hesapla(prompt)
+        if hesap:
+            yanit = hesap
+        else:
+            x_vec = self.vectorizer.transform([prompt])
+            yanit = self.model.predict(x_vec)[0]
+
+        self.output.setText(f">>> {yanit}")
+        self.input_field.clear()
+
+if __name__ == "__main__":
+    app = QApplication(sys.argv)
+    window = BZekaMini()
+    window.show()
+    sys.exit(app.exec_())
